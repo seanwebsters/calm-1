@@ -6,7 +6,7 @@ import { SESSION_COOKIE, verifySession } from "@/lib/auth/session-token";
  * grained permission checks happen in each page and route handler.
  * The WhatsApp webhook and cron endpoints authenticate themselves.
  */
-const PUBLIC = ["/login", "/api/auth/login", "/api/whatsapp/webhook", "/api/cron/tick", "/api/health/live"];
+const PUBLIC = ["/login", "/api/auth/login", "/api/whatsapp/webhook", "/api/twilio/webhook", "/api/twilio/status", "/api/cron/tick", "/api/health/live"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

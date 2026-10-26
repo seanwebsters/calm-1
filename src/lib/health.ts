@@ -7,6 +7,7 @@ import { env } from "./env";
 import { AnthropicLlm } from "./llm/anthropic";
 import { getSettings } from "./settings";
 import { phoneNumberHealth, whatsappConfigured } from "./whatsapp/client";
+import { twilioConfigured, twilioHealth } from "./twilio/client";
 
 export type HealthState = "operational" | "degraded" | "down" | "not_configured";
 
@@ -51,7 +52,11 @@ export async function checkClaude(): Promise<ServiceHealth> {
 
 export async function checkWhatsapp(): Promise<ServiceHealth> {
   return cached("whatsapp", 60_000, async () => {
-    if (!whatsappConfigured()) return { key: "whatsapp", label: "WhatsApp API", state: "not_configured", detail: "Set WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID", latencyMs: null, checkedAt: now() };
+    if (twilioConfigured()) {
+      const t = await twilioHealth();
+      return { key: "whatsapp", label: "WhatsApp API", state: t.ok ? "operational" : "down", detail: t.detail, latencyMs: t.latencyMs, checkedAt: now() };
+    }
+    if (!whatsappConfigured()) return { key: "whatsapp", label: "WhatsApp API", state: "not_configured", detail: "Set the Twilio or Meta WhatsApp settings", latencyMs: null, checkedAt: now() };
     if (!env.whatsappAppSecret || !env.whatsappVerifyToken) return { key: "whatsapp", label: "WhatsApp API", state: "degraded", detail: "Webhook secrets missing (WHATSAPP_APP_SECRET / WHATSAPP_VERIFY_TOKEN)", latencyMs: null, checkedAt: now() };
     const r = await phoneNumberHealth();
     return { key: "whatsapp", label: "WhatsApp API", state: r.ok ? "operational" : "down", detail: r.detail, latencyMs: r.latencyMs, checkedAt: now() };

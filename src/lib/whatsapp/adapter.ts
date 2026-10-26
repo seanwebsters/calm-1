@@ -17,7 +17,7 @@ import { handleInbound } from "../engine/turn";
 import { activeConversation, appendMessage } from "../engine/conversations";
 import * as copy from "../engine/copy";
 import { transcribe, transcriptionConfigured } from "../voice/transcribe";
-import { downloadMedia, getMedia, markReadWithTyping, sendDocument, sendText, whatsappConfigured } from "./client";
+import { acknowledgeInbound, fetchAudio, sendWhatsappDocument, sendWhatsappText, transportConfigured } from "./transport";
 import { parsePayload, textOfWaMessage, type WaStatus } from "./webhook";
 
 export interface WhatsappJobPayload {
@@ -89,7 +89,7 @@ async function deliverReplies(phone: string, replies: { text: string; messageId:
   const store = db();
   for (const r of replies) {
     try {
-      const ids = r.document ? [await sendDocument(phone, r.document.filename, JSON.stringify(r.document.json, null, 2), r.text)] : await sendText(phone, r.text);
+      const ids = r.document ? await sendWhatsappDocument(phone, r.document.filename, JSON.stringify(r.document.json, null, 2), r.text) : await sendWhatsappText(phone, r.text);
       await store.update("messages", r.messageId, { status: "sent", wa_message_id: ids[0] ?? null });
     } catch (e) {
       log.error("whatsapp send failed", { messageId: r.messageId, error: errorMessage(e) });
@@ -110,11 +110,11 @@ export async function processWhatsappMessage(p: WhatsappJobPayload) {
   const existing = await store.findOne("messages", { where: { wa_message_id: p.waMessageId } });
   if (existing) {
     const pending = await store.find("messages", { where: { conversation_id: existing.conversation_id, direction: "outbound", status: "queued" }, gte: { seq: existing.seq + 1 }, orderBy: "seq" });
-    if (whatsappConfigured()) await deliverReplies(phone, pending.map((m) => ({ text: open(m.content_enc), messageId: m.id })));
+    if (transportConfigured()) await deliverReplies(phone, pending.map((m) => ({ text: open(m.content_enc), messageId: m.id })));
     return;
   }
 
-  if (whatsappConfigured()) await markReadWithTyping(p.waMessageId);
+  if (transportConfigured()) await acknowledgeInbound(p.waMessageId);
 
   let text = p.textEnc ? open(p.textEnc) : "";
   let kind: "text" | "voice" | "unsupported" = "text";
@@ -127,9 +127,8 @@ export async function processWhatsappMessage(p: WhatsappJobPayload) {
       preReply = copy.VOICE_UNAVAILABLE;
     } else {
       try {
-        const media = await getMedia(p.mediaId);
-        const audio = await downloadMedia(media.url);
-        const t = await transcribe(audio, p.mime ?? media.mime_type);
+        const { audio, mime } = await fetchAudio(p.mediaId, p.mime);
+        const t = await transcribe(audio, mime);
         text = t.text;
         if (!text) preReply = "I couldn't quite make that voice note out – could you try again or type it?";
         else if (t.confidence < settings.voice.confirmBelowConfidence) preReply = `I want to make sure I heard you right. Did you say: "${text}"?`;
@@ -149,11 +148,11 @@ export async function processWhatsappMessage(p: WhatsappJobPayload) {
     await appendMessage(conv, { direction: "inbound", kind, text: text || null, wa_message_id: p.waMessageId, status: "received", latency_ms: null, input_tokens: null, output_tokens: null, model: null, prompt_version: null, safety_severity: "none", error: null, sent_at: p.sentAt });
     const out = await appendMessage(conv, { direction: "outbound", kind: "system", text: preReply, wa_message_id: null, status: "queued", latency_ms: null, input_tokens: null, output_tokens: null, model: null, prompt_version: null, safety_severity: "none", error: null });
     await store.update("users", user.id, { last_inbound_at: nowIso(), last_active_at: nowIso() });
-    if (whatsappConfigured()) await deliverReplies(phone, [{ text: preReply, messageId: out.id }]);
+    if (transportConfigured()) await deliverReplies(phone, [{ text: preReply, messageId: out.id }]);
     return;
   }
 
   const result = await handleInbound({ user, channel: "whatsapp", text, kind, waMessageId: p.waMessageId, sentAt: p.sentAt });
-  if (whatsappConfigured()) await deliverReplies(phone, result.replies);
+  if (transportConfigured()) await deliverReplies(phone, result.replies);
   if (result.deleted) await deleteUserData(user.id, "whatsapp", null);
 }

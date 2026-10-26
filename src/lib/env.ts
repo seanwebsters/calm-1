@@ -83,6 +83,17 @@ export const env = {
   get whatsappGraphVersion() {
     return str("WHATSAPP_GRAPH_VERSION", "v23.0");
   },
+  get twilioAccountSid() {
+    return str("TWILIO_ACCOUNT_SID");
+  },
+  get twilioAuthToken() {
+    return str("TWILIO_AUTH_TOKEN");
+  },
+  /** e.g. "whatsapp:+14155238886" (the Twilio Sandbox number) */
+  get twilioWhatsappFrom() {
+    // Defaults to Twilio's shared WhatsApp Sandbox number.
+    return str("TWILIO_WHATSAPP_FROM", "whatsapp:+14155238886");
+  },
   get elevenLabsApiKey() {
     return str("ELEVENLABS_API_KEY");
   },

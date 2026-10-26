@@ -18,7 +18,8 @@ import { nowIso, uuid } from "../ids";
 import { errorMessage, log } from "../log";
 import { getSettings } from "../settings";
 import { hasConsent, phoneOf, recordConsent } from "../users/service";
-import { OUTSIDE_WINDOW_CODE, WhatsAppApiError, sendTemplate, sendText, whatsappConfigured } from "../whatsapp/client";
+import { OUTSIDE_WINDOW_CODE, WhatsAppApiError } from "../whatsapp/client";
+import { sendWhatsappTemplate, sendWhatsappText, transportConfigured } from "../whatsapp/transport";
 import { activeConversation, appendMessage } from "../engine/conversations";
 import { inQuietHours, isValidTimezone, localParts, zonedToUtc } from "./time";
 
@@ -172,14 +173,14 @@ async function deliver(
   }
 
   const phone = phoneOf(user);
-  if (!phone || !whatsappConfigured()) {
+  if (!phone || !transportConfigured()) {
     await store.insert("checkin_deliveries", { ...base, template_name: null, mode: "session", status: "failed", error: "WhatsApp is not configured" });
     return "failed";
   }
   const insideWindow = !!user.last_inbound_at && now.getTime() - new Date(user.last_inbound_at).getTime() < 24 * 3600_000 - 5 * 60_000;
   try {
     if (insideWindow) {
-      const [id] = await sendText(phone, text);
+      const [id] = await sendWhatsappText(phone, text);
       await appendMessage(conv, { direction: "outbound", kind: "text", text, wa_message_id: id ?? null, status: "sent", latency_ms: null, input_tokens: null, output_tokens: null, model: null, prompt_version: null, safety_severity: "none", error: null });
       await store.insert("checkin_deliveries", { ...base, template_name: null, mode: "session", status: "sent", wa_message_id: id ?? null, error: null, sent_at: nowIso() });
       return "sent";
@@ -189,7 +190,7 @@ async function deliver(
       await store.insert("checkin_deliveries", { ...base, template_name: null, mode: "template", status: "failed", error: "Outside the 24h window and no approved template for this check-in" });
       return "failed";
     }
-    const id = await sendTemplate(phone, template.name, template.language);
+    const id = await sendWhatsappTemplate(phone, template.name, template.language);
     await appendMessage(conv, { direction: "outbound", kind: "template", text: template.body, wa_message_id: id, status: "sent", latency_ms: null, input_tokens: null, output_tokens: null, model: null, prompt_version: null, safety_severity: "none", error: null });
     await store.insert("checkin_deliveries", { ...base, template_name: template.name, mode: "template", status: "sent", wa_message_id: id, error: null, sent_at: nowIso() });
     return "sent";

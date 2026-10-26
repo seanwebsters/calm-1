@@ -62,6 +62,18 @@ Outside the 24-hour customer-service window, WhatsApp only allows approved templ
 
 Users opt in to check-ins in conversation ("check in on me every morning"). That opt-in is recorded in `user_consents`. STOP or STOP CHECK-INS removes it immediately.
 
+## 3b. WhatsApp via Twilio (no Meta business verification)
+
+Use this instead of section 3 to get going quickly. When the Twilio variables are set, Calm-1 sends and receives WhatsApp through Twilio.
+
+1. Sign up at twilio.com (the free trial is fine).
+2. Console → Messaging → Try it out → **Send a WhatsApp message** (the Sandbox). From your phone, send the shown `join <word>` message to the Sandbox number. Each tester does this once; the Sandbox session lasts 72 hours, after which you send the join message again.
+3. In **Sandbox settings**, set *When a message comes in* to `https://<your-domain>/api/twilio/webhook` (method POST) and save.
+4. In Vercel, set `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` (Console home → Account info), then redeploy. `TWILIO_WHATSAPP_FROM` defaults to the Sandbox number `whatsapp:+14155238886`.
+5. Message the Sandbox number. Calm-1 replies.
+
+Limitations: there are no approved templates through Twilio yet, so check-ins only go out within 24 hours of the user's last message, and data exports aren't sent as files. Requests are verified with `X-Twilio-Signature`. Delivery statuses arrive at `/api/twilio/status` when `APP_URL` is set to your https domain.
+
 ## 4. Environment variables
 
 See `.env.example`. These are required in production:
