@@ -37,11 +37,11 @@ export function LoginForm({ mode, passcodeRequired }: { mode: "local" | "supabas
           <Input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
         </Field>
       ) : (
-        <p className="text-[13px] text-ink-3">Development mode: no passcode is set, so you can sign in as the local owner. Set ADMIN_PASSCODE before sharing this environment.</p>
+        <p className="text-[13px] text-ink-3">No passcode is set, so anyone with this link can open the dashboard. Set ADMIN_PASSCODE to lock it.</p>
       )}
       {error ? <p className="text-[13px] text-bad">{error}</p> : null}
       <Button type="submit" variant="primary" className="w-full justify-center" loading={loading}>
-        {passcodeRequired || mode === "supabase" ? "Sign in" : "Continue as local owner"}
+        {passcodeRequired || mode === "supabase" ? "Sign in" : "Continue"}
       </Button>
     </form>
   );

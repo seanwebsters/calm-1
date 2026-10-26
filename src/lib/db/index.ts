@@ -1,5 +1,6 @@
 import path from "node:path";
 import { env, requireEnv } from "../env";
+import { log } from "../log";
 import { LocalStore } from "./local";
 import type { Store } from "./store";
 import { SupabaseStore } from "./supabase";
@@ -18,8 +19,10 @@ export function db(): Store {
   } else if (backend === "memory") {
     g.__calm1Store = new LocalStore();
   } else {
-    if (env.isProduction && !process.env.ALLOW_LOCAL_STORE_IN_PRODUCTION) {
-      throw new Error("Production requires Supabase. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.");
+    if (env.isProduction) {
+      // Keeps the dashboard usable before Supabase is connected. Data is temporary;
+      // the dashboard shows a warning until SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are set.
+      log.warn("No Supabase configured in production – using temporary local storage");
     }
     g.__calm1Store = new LocalStore({ file: path.join(env.dataDir, "calm-1.json") });
   }

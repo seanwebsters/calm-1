@@ -61,11 +61,8 @@ export async function signOut() {
 export async function signInLocal(passcode: string): Promise<void> {
   if (env.authProvider !== "local") throw new UnauthorizedError("Passcode sign-in is disabled.");
   const expected = env.adminPasscode;
-  if (expected) {
-    if (!timingSafeEqualStr(passcode, expected)) throw new UnauthorizedError("That passcode isn't right.");
-  } else if (env.isProduction) {
-    throw new UnauthorizedError("Set ADMIN_PASSCODE or configure Supabase Auth.");
-  }
+  // With no ADMIN_PASSCODE set, sign-in is open (the dashboard shows a warning).
+  if (expected && !timingSafeEqualStr(passcode, expected)) throw new UnauthorizedError("That passcode isn't right.");
   const row = await ensureLocalOwner();
   await startSession(row);
 }

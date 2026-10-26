@@ -7,7 +7,7 @@ export const metadata = { title: "Sign in" };
 
 export default function LoginPage() {
   const mode = env.authProvider;
-  const passcodeRequired = mode === "local" && (!!env.adminPasscode || env.isProduction);
+  const passcodeRequired = mode === "local" && !!env.adminPasscode;
   return (
     <div className="flex min-h-screen items-center justify-center bg-canvas px-4">
       <div className="w-full max-w-[380px]">

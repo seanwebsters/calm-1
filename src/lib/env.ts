@@ -26,7 +26,16 @@ export const env = {
     return str("SUPABASE_URL") && str("SUPABASE_SERVICE_ROLE_KEY") ? "supabase" : "local";
   },
   get dataDir() {
-    return str("DATA_DIR", path.join(process.cwd(), ".data"));
+    // Serverless hosts only allow writes under /tmp.
+    return str("DATA_DIR", process.env.VERCEL ? "/tmp/calm-1" : path.join(process.cwd(), ".data"));
+  },
+  /** Production without Supabase: data lives in temporary storage and is lost on restart. */
+  get temporaryStorage() {
+    return this.isProduction && this.dataBackend !== "supabase";
+  },
+  /** No passcode or Supabase Auth: anyone with the link can open the dashboard. */
+  get openAccess() {
+    return this.authProvider === "local" && !this.adminPasscode;
   },
   get supabaseUrl() {
     return str("SUPABASE_URL");

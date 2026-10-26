@@ -21,7 +21,7 @@ function loadKey(): Buffer {
     cachedKey = key;
     return key;
   }
-  if (env.isProduction) throw new Error("DATA_ENCRYPTION_KEY is required in production.");
+  if (env.isProduction && env.dataBackend === "supabase") throw new Error("DATA_ENCRYPTION_KEY is required when using Supabase.");
   // Development only: persist a generated key next to the local data file.
   const file = path.join(env.dataDir, ".dev-encryption-key");
   try {
@@ -55,7 +55,7 @@ export function open(sealed: string | null | undefined): string {
 
 /** Keyed hash for looking a user up by phone number without storing it in clear. */
 export function phoneHash(phone: string): string {
-  const pepper = env.phoneHashPepper || (env.isProduction ? "" : "dev-pepper");
+  const pepper = env.phoneHashPepper || (env.isProduction && env.dataBackend === "supabase" ? "" : "dev-pepper");
   if (!pepper) throw new Error("PHONE_HASH_PEPPER is required in production.");
   return createHmac("sha256", pepper).update(normalisePhone(phone)).digest("hex");
 }
