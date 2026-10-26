@@ -207,3 +207,15 @@ export async function markCheckinReplied(userId: string) {
   const [last] = await store.find("checkin_deliveries", { where: { user_id: userId, replied_at: null }, in: { status: ["sent", "delivered", "read"] }, orderBy: "created_at", desc: true, limit: 1 });
   if (last && Date.now() - new Date(last.created_at).getTime() < 12 * 3600_000) await store.update("checkin_deliveries", last.id, { replied_at: nowIso() });
 }
+
+/** Simulator/testing: deliver a user's check-in now through the normal scheduler path. */
+export async function triggerCheckinNow(userId: string, kind: CheckinKind) {
+  const store = db();
+  const pref = await store.findOne("checkin_preferences", { where: { user_id: userId, kind, enabled: true } });
+  if (!pref) throw new AppError(`This user has no ${kind} check-in. Ask Calm-1 to set one up first.`);
+  const sched = await store.findOne("checkin_schedules", { where: { preference_id: pref.id } });
+  if (!sched) throw new AppError("No schedule for this check-in.");
+  const now = new Date();
+  await store.update("checkin_schedules", sched.id, { next_run_at: new Date(now.getTime() - 1000).toISOString() });
+  return runDueCheckins(now);
+}

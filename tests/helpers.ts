@@ -48,7 +48,9 @@ export class FakeLlm implements Llm {
     if (req.jsonSchema && sys.startsWith("You decide what a wellbeing companion")) {
       blocks = [{ type: "text", text: JSON.stringify(this.handlers.extract?.(req) ?? { memories: [] }) }];
     } else if (req.jsonSchema && sys.startsWith("You are a safety classifier")) {
-      blocks = [{ type: "text", text: JSON.stringify(this.handlers.review?.(req) ?? { risk_level: "none", category: "none", about_someone_else_or_hypothetical: false }) }];
+      // Without a scripted review, behave like an unavailable reviewer so the rules stand.
+      if (!this.handlers.review) throw new Error("no safety review scripted");
+      blocks = [{ type: "text", text: JSON.stringify(this.handlers.review(req)) }];
     } else if (sys.startsWith("Summarise a conversation")) {
       blocks = [{ type: "text", text: this.handlers.summary?.(req) ?? "- summary" }];
     } else {

@@ -34,7 +34,7 @@ const now = () => new Date().toISOString();
 export async function checkDatabase(): Promise<ServiceHealth> {
   try {
     const r = await db().ping();
-    return { key: "database", label: "Database", state: r.ok ? "operational" : "down", detail: r.ok ? (db().kind === "supabase" ? "Supabase Postgres" : `Local ${db().kind} store (development)`) : (r.error ?? "Unreachable"), latencyMs: r.latencyMs, checkedAt: now() };
+    return { key: "database", label: "Database", state: r.ok ? "operational" : "down", detail: r.ok ? (db().kind === "supabase" ? "Supabase Postgres" : db().kind === "local" ? "Local JSON store (development)" : "In-memory store") : (r.error ?? "Unreachable"), latencyMs: r.latencyMs, checkedAt: now() };
   } catch (e) {
     return { key: "database", label: "Database", state: "down", detail: String(e), latencyMs: null, checkedAt: now() };
   }

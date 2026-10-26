@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    @apply bg-canvas text-ink font-sans text-[14px] leading-6 tracking-tightish;
+    font-feature-settings: "cv11", "ss01", "ss03";
+  }
+  ::selection {
+    @apply bg-calm-100 text-ink;
+  }
+  :focus-visible {
+    @apply outline-none shadow-focus;
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #d5dae3 transparent;
+  }
+}
+
+/* Recharts: keep axes and grid recessive */
+.recharts-cartesian-axis-tick-value {
+  fill: #8c97ac;
+  font-size: 11px;
+}
+.recharts-default-tooltip {
+  border-radius: 12px !important;
+}
