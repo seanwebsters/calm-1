@@ -5,7 +5,8 @@
 import path from "node:path";
 
 function str(name: string, fallback = ""): string {
-  const v = process.env[name];
+  // Trim: values pasted into hosting dashboards often carry stray spaces or newlines.
+  const v = process.env[name]?.trim();
   return v === undefined || v === "" ? fallback : v;
 }
 
