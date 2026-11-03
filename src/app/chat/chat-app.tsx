@@ -37,7 +37,9 @@ export function ChatApp() {
 
   const load = async () => {
     const r = await fetch("/api/chat/state", { cache: "no-store" });
-    if (r.ok) setMsgs(((await r.json()) as { messages: Msg[] }).messages);
+    if (!r.ok) return;
+    const server = ((await r.json()) as { messages: Msg[] }).messages;
+    setMsgs((m) => (server.length >= m.length ? server : m));
   };
 
   useEffect(() => {
@@ -60,12 +62,11 @@ export function ChatApp() {
       const r = await fetch("/api/chat/message", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: body }) });
       const j = (await r.json()) as { replies?: { id: string; text: string }[]; deleted?: boolean; error?: string | null };
       if (!r.ok) throw new Error(j.error ?? "Something went wrong");
-      if (j.deleted) {
-        setMsgs((m) => [...m, ...(j.replies ?? []).map((x) => ({ id: x.id, direction: "outbound" as const, text: x.text, at: new Date().toISOString() }))]);
-        return;
-      }
+      // Show replies straight from the response (don't depend on re-reading storage).
+      const replies = (j.replies ?? []).map((x) => ({ id: x.id, direction: "outbound" as const, text: x.text, at: new Date().toISOString() }));
+      setMsgs((m) => [...m, ...replies]);
       if (j.error) setError(j.error);
-      await load();
+      else if (!replies.length) setError("Calm-1 didn't reply. It may not be fully set up yet (the Claude key).");
     } catch (err) {
       setError(err instanceof Error && err.message.includes("Too many") ? "You're sending messages quickly – give it a moment." : "Couldn't send. Check your connection and try again.");
     } finally {

@@ -23,5 +23,13 @@ export const POST = handle(async (req: Request) => {
     await clearChatCookie();
   }
   after(() => kickWorker());
-  return json({ replies: result.replies.map((r) => ({ id: r.messageId, text: r.text })), deleted: !!result.deleted, error: result.debug.path === "error" ? "Calm-1 couldn't reply just now." : null });
+  return json({ replies: result.replies.map((r) => ({ id: r.messageId, text: r.text })), deleted: !!result.deleted, error: chatError(result.debug) });
 });
+
+function chatError(d: { path: string; error?: string }): string | null {
+  if (d.path !== "error") return null;
+  if (d.error?.includes("not configured")) return "Calm-1 isn't fully set up yet: the Claude key (ANTHROPIC_API_KEY) is missing in Vercel.";
+  if (d.error && /401|authentication|api.key|x-api-key/i.test(d.error)) return "The Claude key in Vercel isn't valid. It should start with sk-ant-api03-.";
+  if (d.error && /credit|billing|balance/i.test(d.error)) return "The Claude account needs credit (console.anthropic.com → Billing).";
+  return "Calm-1 couldn't reply just now.";
+}
