@@ -107,8 +107,8 @@ export function ChatApp() {
       <main className="flex-1 overflow-y-auto px-3 py-4" onClick={() => setMenu(false)}>
         <div className="mx-auto flex max-w-xl flex-col gap-2">
           {msgs.length === 0 && !sending ? (
-            <div className="mx-auto mt-16 max-w-xs text-center">
-              <LogoMark size={52} />
+            <div className="mx-auto mt-16 flex max-w-xs flex-col items-center text-center">
+              <LogoMark size={64} />
               <p className="mt-4 text-[17px] font-semibold text-ink">Calm, just a message away.</p>
               <p className="mt-1 text-[14px] text-ink-3">Say hi to start. This is a test version of Calm-1 – it works just like it will on WhatsApp.</p>
             </div>

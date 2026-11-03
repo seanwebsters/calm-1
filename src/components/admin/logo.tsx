@@ -1,16 +1,6 @@
+/* eslint-disable @next/next/no-img-element */
 export function LogoMark({ size = 28 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden>
-      <defs>
-        <linearGradient id="calm1-logo" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#5C8FEA" />
-          <stop offset="1" stopColor="#1C4A9E" />
-        </linearGradient>
-      </defs>
-      <rect width="64" height="64" rx="16" fill="url(#calm1-logo)" />
-      <path d="M40 22.5a12 12 0 1 0 0 19" fill="none" stroke="#fff" strokeWidth="5" strokeLinecap="round" />
-    </svg>
-  );
+  return <img src="/brand/calm-icon.png" alt="Calm" width={size} height={size} style={{ width: size, height: size, borderRadius: size * 0.22 }} className="shrink-0" />;
 }
 
 export function Wordmark() {
