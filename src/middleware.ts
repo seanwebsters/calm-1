@@ -10,7 +10,8 @@ const PUBLIC = ["/api/auth/auto", "/chat", "/api/chat", "/manifest.webmanifest",
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  if (PUBLIC.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return NextResponse.next();
+  // The site root opens the public test chat.
+  if (pathname === "/" || PUBLIC.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return NextResponse.next();
   const session = await verifySession(req.cookies.get(SESSION_COOKIE)?.value);
   if (session) return NextResponse.next();
   if (pathname.startsWith("/api/")) return NextResponse.json({ error: "Sign in required." }, { status: 401 });
