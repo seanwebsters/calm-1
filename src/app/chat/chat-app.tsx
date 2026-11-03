@@ -10,6 +10,7 @@ import { ChevronLeft, MoreVertical, Plus, RotateCcw, SendHorizontal, Smile, X } 
 import { BreathingCard } from "./breathing-card";
 import { ContentCards, type ContentItem } from "./content-card";
 import { BubblePopCard, FloatAwayCard, GroundingCard, MoodCard, SleepCard } from "./activities";
+import { AffirmationCard, BodyScanCard, GratitudeCard, MuscleReleaseCard, SheepCard, SoundsCard, StillnessCard } from "./activities2";
 import { cn } from "@/lib/utils";
 
 type Widget =
@@ -19,7 +20,14 @@ type Widget =
   | { type: "bubbles" }
   | { type: "floataway" }
   | { type: "mood" }
-  | { type: "sleep"; need: string };
+  | { type: "sleep"; need: string }
+  | { type: "sounds" }
+  | { type: "bodyscan" }
+  | { type: "muscle" }
+  | { type: "stillness" }
+  | { type: "sheep" }
+  | { type: "gratitude" }
+  | { type: "affirmation" };
 
 interface Msg {
   id: string;
@@ -73,19 +81,28 @@ function Ticks() {
 }
 
 /** Activities anyone can start without asking Calm-1 (web test chat only). */
-const ACTIVITIES: { key: string; label: string; emoji: string; color: string; intro: string; widget: Widget }[] = [
-  { key: "slow", label: "Breathe", emoji: "🫧", color: "#5c8fea", intro: "Let's breathe together. Tap start and follow the bubble 🫧", widget: { type: "breathing", style: "slow" } },
-  { key: "sigh", label: "Calming sigh", emoji: "😮‍💨", color: "#7f66ff", intro: "A calming sigh: two breaths in, one long breath out. Tap start.", widget: { type: "breathing", style: "sigh" } },
-  { key: "box", label: "Box breath", emoji: "🟦", color: "#2f6fde", intro: "Box breathing: in, hold, out, hold. Tap start when ready.", widget: { type: "breathing", style: "box" } },
-  { key: "even", label: "Even breath", emoji: "〰️", color: "#00a3a3", intro: "An even 5-5 rhythm. Nothing to force – just follow along.", widget: { type: "breathing", style: "even" } },
-  { key: "ground", label: "5-4-3-2-1", emoji: "✋", color: "#00a884", intro: "Let's ground you in the room around you. Tap as you notice each thing.", widget: { type: "grounding" } },
-  { key: "bubbles", label: "Pop bubbles", emoji: "🎈", color: "#e86aa6", intro: "Pop a few bubbles, slowly. Breathe out as you tap.", widget: { type: "bubbles" } },
-  { key: "float", label: "Let it go", emoji: "☁️", color: "#4aa8e8", intro: "Type a worry and let it float away. It isn't saved anywhere.", widget: { type: "floataway" } },
-  { key: "mood", label: "Mood check", emoji: "🙂", color: "#f2a33a", intro: "Quick check-in:", widget: { type: "mood" } },
-  { key: "sleep", label: "Wind down", emoji: "🌙", color: "#3b3f8f", intro: "Here's a gentle wind-down for tonight. Tick things off as you go.", widget: { type: "sleep", need: "wind_down" } },
-  { key: "windbreath", label: "Sleep breath", emoji: "💤", color: "#6a5fdc", intro: "Wind-down breathing for bed: in 4, hold 7, out 8.", widget: { type: "breathing", style: "wind_down" } },
+type Activity = { key: string; label: string; emoji: string; color: string; intro: string; widget: Widget; section: "Breathe" | "Calm down" | "Sleep" | "Feel good" };
+const ACTIVITIES: Activity[] = [
+  { section: "Breathe", key: "slow", label: "Breathe", emoji: "🫧", color: "#5c8fea", intro: "Let's breathe together. Tap start and follow the bubble 🫧", widget: { type: "breathing", style: "slow" } },
+  { section: "Breathe", key: "sigh", label: "Calming sigh", emoji: "😮‍💨", color: "#7f66ff", intro: "A calming sigh: two breaths in, one long breath out. Tap start.", widget: { type: "breathing", style: "sigh" } },
+  { section: "Breathe", key: "box", label: "Box breath", emoji: "🟦", color: "#2f6fde", intro: "Box breathing: in, hold, out, hold. Tap start when ready.", widget: { type: "breathing", style: "box" } },
+  { section: "Breathe", key: "even", label: "Even breath", emoji: "〰️", color: "#00a3a3", intro: "An even 5-5 rhythm. Nothing to force – just follow along.", widget: { type: "breathing", style: "even" } },
+  { section: "Calm down", key: "ground", label: "5-4-3-2-1", emoji: "✋", color: "#00a884", intro: "Let's ground you in the room around you. Tap as you notice each thing.", widget: { type: "grounding" } },
+  { section: "Calm down", key: "bubbles", label: "Pop bubbles", emoji: "🎈", color: "#e86aa6", intro: "Pop a few bubbles, slowly. Breathe out as you tap.", widget: { type: "bubbles" } },
+  { section: "Calm down", key: "muscle", label: "Squeeze & release", emoji: "✊", color: "#f08a5d", intro: "Squeeze and release, one part of your body at a time. Hold the button to squeeze.", widget: { type: "muscle" } },
+  { section: "Calm down", key: "bodyscan", label: "Body scan", emoji: "🧍", color: "#3a4a8a", intro: "A one-minute body scan, head to toe. Tap start whenever you're ready.", widget: { type: "bodyscan" } },
+  { section: "Calm down", key: "stillness", label: "1 min stillness", emoji: "⏳", color: "#5e8c6a", intro: "One minute of doing nothing at all. A chime will let you know when it's done.", widget: { type: "stillness" } },
+  { section: "Calm down", key: "float", label: "Let it go", emoji: "☁️", color: "#4aa8e8", intro: "Type a worry and let it float away. It isn't saved anywhere.", widget: { type: "floataway" } },
+  { section: "Sleep", key: "sounds", label: "Calm sounds", emoji: "🌧️", color: "#284b63", intro: "Some calming sounds. Pick one, and set a sleep timer if you like.", widget: { type: "sounds" } },
+  { section: "Sleep", key: "sheep", label: "Count sheep", emoji: "🐑", color: "#1e2a5e", intro: "Watch the sheep, breathe out slowly as each one jumps…", widget: { type: "sheep" } },
+  { section: "Sleep", key: "sleep", label: "Wind down", emoji: "🌙", color: "#3b3f8f", intro: "Here's a gentle wind-down for tonight. Tick things off as you go.", widget: { type: "sleep", need: "wind_down" } },
+  { section: "Sleep", key: "windbreath", label: "Sleep breath", emoji: "💤", color: "#6a5fdc", intro: "Wind-down breathing for bed: in 4, hold 7, out 8.", widget: { type: "breathing", style: "wind_down" } },
+  { section: "Feel good", key: "gratitude", label: "Gratitude jar", emoji: "🌟", color: "#e7b43a", intro: "Let's fill a little jar with three good things from today.", widget: { type: "gratitude" } },
+  { section: "Feel good", key: "affirm", label: "Kind words", emoji: "💛", color: "#c96ad0", intro: "A gentle reminder for you:", widget: { type: "affirmation" } },
+  { section: "Feel good", key: "mood", label: "Mood check", emoji: "🙂", color: "#f2a33a", intro: "Quick check-in:", widget: { type: "mood" } },
 ];
-const QUICK = ["slow", "sigh", "ground", "bubbles"];
+const SECTIONS: Activity["section"][] = ["Breathe", "Calm down", "Sleep", "Feel good"];
+const QUICK = ["slow", "sigh", "ground", "sounds", "bubbles"];
 
 export function ChatApp() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
@@ -244,6 +261,20 @@ export function ChatApp() {
                       return <MoodCard key={wi} onPick={(t) => void send(undefined, t)} />;
                     case "sleep":
                       return <SleepCard key={wi} need={w.need} />;
+                    case "sounds":
+                      return <SoundsCard key={wi} />;
+                    case "bodyscan":
+                      return <BodyScanCard key={wi} />;
+                    case "muscle":
+                      return <MuscleReleaseCard key={wi} />;
+                    case "stillness":
+                      return <StillnessCard key={wi} />;
+                    case "sheep":
+                      return <SheepCard key={wi} />;
+                    case "gratitude":
+                      return <GratitudeCard key={wi} />;
+                    case "affirmation":
+                      return <AffirmationCard key={wi} />;
                   }
                 })}
               </motion.div>
@@ -325,14 +356,21 @@ export function ChatApp() {
                   <X className="h-5 w-5" />
                 </button>
               </div>
-              <div className="grid grid-cols-4 gap-x-2 gap-y-4 pb-2">
-                {ACTIVITIES.map((a) => (
-                  <button key={a.key} onClick={() => startActivity(a.key)} className="flex flex-col items-center gap-1.5">
-                    <span className="flex h-14 w-14 items-center justify-center rounded-full text-[24px] shadow-sm" style={{ background: a.color }}>
-                      {a.emoji}
-                    </span>
-                    <span className="text-center text-[11.5px] leading-tight text-[#54656f]">{a.label}</span>
-                  </button>
+              <div className="max-h-[62vh] space-y-4 overflow-y-auto pb-2">
+                {SECTIONS.map((sec) => (
+                  <div key={sec}>
+                    <div className="mb-2 text-[12px] font-medium uppercase tracking-[0.08em] text-[#8696a0]">{sec}</div>
+                    <div className="grid grid-cols-4 gap-x-2 gap-y-3">
+                      {ACTIVITIES.filter((a) => a.section === sec).map((a) => (
+                        <button key={a.key} onClick={() => startActivity(a.key)} className="flex flex-col items-center gap-1.5">
+                          <span className="flex h-14 w-14 items-center justify-center rounded-full text-[24px] shadow-sm" style={{ background: a.color }}>
+                            {a.emoji}
+                          </span>
+                          <span className="text-center text-[11.5px] leading-tight text-[#54656f]">{a.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             </motion.div>
