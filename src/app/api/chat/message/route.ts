@@ -23,7 +23,10 @@ export const POST = handle(async (req: Request) => {
     await clearChatCookie();
   }
   after(() => kickWorker());
-  return json({ replies: result.replies.map((r) => ({ id: r.messageId, text: r.text })), deleted: !!result.deleted, error: chatError(result.debug) });
+  // Visual extras for the web chat: an animated card for each breathing exercise Calm-1 ran.
+  const breathing = result.debug.tools.filter((t) => t.name === "breathing_exercise" && t.status === "ok").map((t) => String(t.input.style ?? "slow"));
+  const replies = result.replies.map((r, i, all) => ({ id: r.messageId, text: r.text, ...(i === all.length - 1 && breathing.length ? { widget: { type: "breathing", style: breathing[0] } } : {}) }));
+  return json({ replies, deleted: !!result.deleted, error: chatError(result.debug) });
 });
 
 function chatError(d: { path: string; error?: string }): string | null {

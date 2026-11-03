@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MoreVertical, RotateCcw, Send } from "lucide-react";
 import { LogoMark } from "@/components/admin/logo";
+import { BreathingCard } from "./breathing-card";
 import { cn } from "@/lib/utils";
 
 interface Msg {
@@ -10,6 +11,21 @@ interface Msg {
   direction: "inbound" | "outbound";
   text: string;
   at: string;
+  widget?: { type: "breathing"; style: string };
+}
+
+const WIDGETS_KEY = "calm1-chat-widgets";
+function savedWidgets(): Record<string, Msg["widget"]> {
+  try {
+    return JSON.parse(localStorage.getItem(WIDGETS_KEY) ?? "{}") as Record<string, Msg["widget"]>;
+  } catch {
+    return {};
+  }
+}
+function saveWidget(id: string, w: Msg["widget"]) {
+  try {
+    localStorage.setItem(WIDGETS_KEY, JSON.stringify({ ...savedWidgets(), [id]: w }));
+  } catch {}
 }
 
 /** Render WhatsApp-style *bold* and links. */
@@ -38,7 +54,8 @@ export function ChatApp() {
   const load = async () => {
     const r = await fetch("/api/chat/state", { cache: "no-store" });
     if (!r.ok) return;
-    const server = ((await r.json()) as { messages: Msg[] }).messages;
+    const w = savedWidgets();
+    const server = ((await r.json()) as { messages: Msg[] }).messages.map((m) => (w[m.id] ? { ...m, widget: w[m.id] } : m));
     setMsgs((m) => (server.length >= m.length ? server : m));
   };
 
@@ -60,10 +77,13 @@ export function ChatApp() {
     setMsgs((m) => [...m, tmp]);
     try {
       const r = await fetch("/api/chat/message", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: body }) });
-      const j = (await r.json()) as { replies?: { id: string; text: string }[]; deleted?: boolean; error?: string | null };
+      const j = (await r.json()) as { replies?: { id: string; text: string; widget?: Msg["widget"] }[]; deleted?: boolean; error?: string | null };
       if (!r.ok) throw new Error(j.error ?? "Something went wrong");
       // Show replies straight from the response (don't depend on re-reading storage).
-      const replies = (j.replies ?? []).map((x) => ({ id: x.id, direction: "outbound" as const, text: x.text, at: new Date().toISOString() }));
+      const replies = (j.replies ?? []).map((x) => {
+        if (x.widget) saveWidget(x.id, x.widget);
+        return { id: x.id, direction: "outbound" as const, text: x.text, at: new Date().toISOString(), widget: x.widget };
+      });
       setMsgs((m) => [...m, ...replies]);
       if (j.error) setError(j.error);
       else if (!replies.length) setError("Calm-1 didn't reply. It may not be fully set up yet (the Claude key).");
@@ -114,11 +134,12 @@ export function ChatApp() {
             </div>
           ) : null}
           {msgs.map((m) => (
-            <motion.div key={m.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15 }} className={cn("flex", m.direction === "inbound" ? "justify-end" : "justify-start")}>
+            <motion.div key={m.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15 }} className={cn("flex flex-col", m.direction === "inbound" ? "items-end" : "items-start")}>
               <div className={cn("max-w-[82%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-[15px] leading-[1.45]", m.direction === "inbound" ? "rounded-br-md bg-calm-500 text-white" : "rounded-bl-md border border-line bg-surface text-ink")}>
                 {rich(m.text)}
                 <div className={cn("mt-0.5 text-right text-[10.5px]", m.direction === "inbound" ? "text-white/70" : "text-ink-4")}>{new Date(m.at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</div>
               </div>
+              {m.widget?.type === "breathing" ? <BreathingCard style={m.widget.style} /> : null}
             </motion.div>
           ))}
           <AnimatePresence>
@@ -138,6 +159,22 @@ export function ChatApp() {
       </main>
 
       <form onSubmit={send} className="border-t border-line bg-surface px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-2.5">
+        <div className="mx-auto mb-2 flex max-w-xl gap-1.5 overflow-x-auto">
+          {[
+            { style: "slow", label: "Breathe · 1 min" },
+            { style: "box", label: "Box breathing" },
+            { style: "wind_down", label: "Wind down" },
+          ].map((b) => (
+            <button
+              key={b.style}
+              type="button"
+              onClick={() => setMsgs((m) => [...m, { id: `local-${Date.now()}`, direction: "outbound", text: "Here's a breathing exercise. Tap start and follow the bubble.", at: new Date().toISOString(), widget: { type: "breathing", style: b.style } }])}
+              className="whitespace-nowrap rounded-full border border-calm-100 bg-calm-50 px-3 py-1.5 text-[12.5px] font-medium text-calm-700"
+            >
+              {b.label}
+            </button>
+          ))}
+        </div>
         <div className="mx-auto flex max-w-xl items-end gap-2">
           <textarea
             value={text}
