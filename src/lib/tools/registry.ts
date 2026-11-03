@@ -50,8 +50,8 @@ function tool<S extends z.ZodTypeAny>(name: string, description: string, schema:
 const breathing = tool(
   "breathing_exercise",
   "Get a short, vetted breathing exercise to guide the user through. Use when they want to calm down, feel anxious, or are winding down.",
-  z.object({ style: z.enum(["box", "slow", "wind_down"]) }),
-  { required: ["style"], properties: { style: { type: "string", enum: ["box", "slow", "wind_down"], description: "box: steadying; slow: quick calm with long out-breath; wind_down: before sleep" } } },
+  z.object({ style: z.enum(["box", "slow", "sigh", "even", "wind_down"]) }),
+  { required: ["style"], properties: { style: { type: "string", enum: ["box", "slow", "sigh", "even", "wind_down"], description: "box: steadying; slow: quick calm with long out-breath; sigh: fastest reset for a racing heart or panic; even: balanced 5-5 rhythm; wind_down: before sleep" } } },
   async ({ style }) => ({ result: BREATHING[style], summary: `breathing:${style}`, loggedInput: { style } }),
 );
 

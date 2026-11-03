@@ -30,6 +30,9 @@ export const POST = handle(async (req: Request) => {
   const widgets: Record<string, unknown>[] = [];
   for (const t of result.debug.tools.filter((x) => x.status === "ok")) {
     if (t.name === "breathing_exercise") widgets.push({ type: "breathing", style: String(t.input.style ?? "slow") });
+    if (t.name === "grounding_exercise" && t.input.style === "five_senses") widgets.push({ type: "grounding" });
+    if (t.name === "sleep_support") widgets.push({ type: "sleep", need: String(t.input.need ?? "wind_down") });
+    if (t.name === "reflection_prompt" && t.input.focus === "letting_go") widgets.push({ type: "floataway" });
     if (t.name === "search_calm_content") {
       const ids = (t.input.results as string[] | undefined) ?? [];
       const items = (await Promise.all(ids.slice(0, 2).map((id) => db().get("content_items", id)))).filter(Boolean);

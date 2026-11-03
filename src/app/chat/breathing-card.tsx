@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Pause, Play, RotateCcw } from "lucide-react";
 
-type Phase = { label: "Breathe in" | "Hold" | "Breathe out"; secs: number };
+type Phase = { label: "Breathe in" | "Hold" | "Breathe out" | "Top up"; secs: number; scale?: number };
 
 export const PATTERNS: Record<string, { name: string; phases: Phase[]; rounds: number }> = {
   box: {
@@ -27,6 +27,23 @@ export const PATTERNS: Record<string, { name: string; phases: Phase[]; rounds: n
     phases: [
       { label: "Breathe in", secs: 4 },
       { label: "Breathe out", secs: 6 },
+    ],
+  },
+  sigh: {
+    name: "Calming sigh",
+    rounds: 5,
+    phases: [
+      { label: "Breathe in", secs: 2, scale: 0.88 },
+      { label: "Top up", secs: 1, scale: 1 },
+      { label: "Breathe out", secs: 6 },
+    ],
+  },
+  even: {
+    name: "Even breathing",
+    rounds: 6,
+    phases: [
+      { label: "Breathe in", secs: 5 },
+      { label: "Breathe out", secs: 5 },
     ],
   },
   wind_down: {
@@ -67,7 +84,7 @@ export function BreathingCard({ style }: { style: string }) {
   }, [running, pattern]);
 
   // Bubble size follows the breath: grow on the in-breath, stay on holds, shrink on the out-breath.
-  const target = !running && !done ? SMALL : phase.label === "Breathe in" ? 1 : phase.label === "Breathe out" ? SMALL : scaleRef.current;
+  const target = !running && !done ? SMALL : phase.scale ?? (phase.label === "Breathe in" ? 1 : phase.label === "Breathe out" ? SMALL : scaleRef.current);
   scaleRef.current = target;
   const duration = running && phase.label !== "Hold" ? phase.secs : 0.6;
 
@@ -138,7 +155,7 @@ export function BreathingCard({ style }: { style: string }) {
         )}
       </div>
       <p className="mt-2 text-center text-[11px] text-ink-4">
-        {pattern.phases.map((p) => `${p.label === "Breathe in" ? "In" : p.label === "Breathe out" ? "Out" : "Hold"} ${p.secs}`).join(" · ")} — go gently, stop if you feel light-headed.
+        {pattern.phases.map((p) => `${p.label === "Breathe in" ? "In" : p.label === "Breathe out" ? "Out" : p.label === "Top up" ? "Top up" : "Hold"} ${p.secs}`).join(" · ")} — go gently, stop if you feel light-headed.
       </p>
     </div>
   );

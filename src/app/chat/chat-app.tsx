@@ -6,12 +6,20 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, MoreVertical, RotateCcw, SendHorizontal, Smile } from "lucide-react";
+import { ChevronLeft, MoreVertical, Plus, RotateCcw, SendHorizontal, Smile, X } from "lucide-react";
 import { BreathingCard } from "./breathing-card";
 import { ContentCards, type ContentItem } from "./content-card";
+import { BubblePopCard, FloatAwayCard, GroundingCard, MoodCard, SleepCard } from "./activities";
 import { cn } from "@/lib/utils";
 
-type Widget = { type: "breathing"; style: string } | { type: "content"; items: ContentItem[] };
+type Widget =
+  | { type: "breathing"; style: string }
+  | { type: "content"; items: ContentItem[] }
+  | { type: "grounding" }
+  | { type: "bubbles" }
+  | { type: "floataway" }
+  | { type: "mood" }
+  | { type: "sleep"; need: string };
 
 interface Msg {
   id: string;
@@ -64,11 +72,20 @@ function Ticks() {
   );
 }
 
-const QUICK = [
-  { style: "slow", label: "🫧 Breathe · 1 min" },
-  { style: "box", label: "🟦 Box breathing" },
-  { style: "wind_down", label: "🌙 Wind down" },
+/** Activities anyone can start without asking Calm-1 (web test chat only). */
+const ACTIVITIES: { key: string; label: string; emoji: string; color: string; intro: string; widget: Widget }[] = [
+  { key: "slow", label: "Breathe", emoji: "🫧", color: "#5c8fea", intro: "Let's breathe together. Tap start and follow the bubble 🫧", widget: { type: "breathing", style: "slow" } },
+  { key: "sigh", label: "Calming sigh", emoji: "😮‍💨", color: "#7f66ff", intro: "A calming sigh: two breaths in, one long breath out. Tap start.", widget: { type: "breathing", style: "sigh" } },
+  { key: "box", label: "Box breath", emoji: "🟦", color: "#2f6fde", intro: "Box breathing: in, hold, out, hold. Tap start when ready.", widget: { type: "breathing", style: "box" } },
+  { key: "even", label: "Even breath", emoji: "〰️", color: "#00a3a3", intro: "An even 5-5 rhythm. Nothing to force – just follow along.", widget: { type: "breathing", style: "even" } },
+  { key: "ground", label: "5-4-3-2-1", emoji: "✋", color: "#00a884", intro: "Let's ground you in the room around you. Tap as you notice each thing.", widget: { type: "grounding" } },
+  { key: "bubbles", label: "Pop bubbles", emoji: "🎈", color: "#e86aa6", intro: "Pop a few bubbles, slowly. Breathe out as you tap.", widget: { type: "bubbles" } },
+  { key: "float", label: "Let it go", emoji: "☁️", color: "#4aa8e8", intro: "Type a worry and let it float away. It isn't saved anywhere.", widget: { type: "floataway" } },
+  { key: "mood", label: "Mood check", emoji: "🙂", color: "#f2a33a", intro: "Quick check-in:", widget: { type: "mood" } },
+  { key: "sleep", label: "Wind down", emoji: "🌙", color: "#3b3f8f", intro: "Here's a gentle wind-down for tonight. Tick things off as you go.", widget: { type: "sleep", need: "wind_down" } },
+  { key: "windbreath", label: "Sleep breath", emoji: "💤", color: "#6a5fdc", intro: "Wind-down breathing for bed: in 4, hold 7, out 8.", widget: { type: "breathing", style: "wind_down" } },
 ];
+const QUICK = ["slow", "sigh", "ground", "bubbles"];
 
 export function ChatApp() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
@@ -76,7 +93,15 @@ export function ChatApp() {
   const [sending, setSending] = useState(false);
   const [menu, setMenu] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sheet, setSheet] = useState(false);
   const end = useRef<HTMLDivElement>(null);
+
+  const startActivity = (key: string) => {
+    const a = ACTIVITIES.find((x) => x.key === key);
+    if (!a) return;
+    setSheet(false);
+    setMsgs((m) => [...m, { id: `local-${Date.now()}`, direction: "outbound", text: a.intro, at: new Date().toISOString(), widgets: [a.widget] }]);
+  };
 
   const load = async () => {
     const r = await fetch("/api/chat/state", { cache: "no-store" });
@@ -93,9 +118,9 @@ export function ChatApp() {
     end.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [msgs.length, sending]);
 
-  async function send(e?: React.FormEvent) {
+  async function send(e?: React.FormEvent, override?: string) {
     e?.preventDefault();
-    const body = text.trim();
+    const body = (override ?? text).trim();
     if (!body || sending) return;
     setText("");
     setError(null);
@@ -203,9 +228,24 @@ export function ChatApp() {
                     {mine ? <Ticks /> : null}
                   </span>
                 </div>
-                {(m.widgets ?? []).map((w, wi) =>
-                  w.type === "breathing" ? <BreathingCard key={wi} style={w.style} /> : w.type === "content" ? <ContentCards key={wi} items={w.items} /> : null,
-                )}
+                {(m.widgets ?? []).map((w, wi) => {
+                  switch (w.type) {
+                    case "breathing":
+                      return <BreathingCard key={wi} style={w.style} />;
+                    case "content":
+                      return <ContentCards key={wi} items={w.items} />;
+                    case "grounding":
+                      return <GroundingCard key={wi} />;
+                    case "bubbles":
+                      return <BubblePopCard key={wi} />;
+                    case "floataway":
+                      return <FloatAwayCard key={wi} />;
+                    case "mood":
+                      return <MoodCard key={wi} onPick={(t) => void send(undefined, t)} />;
+                    case "sleep":
+                      return <SleepCard key={wi} need={w.need} />;
+                  }
+                })}
               </motion.div>
             );
           })}
@@ -229,18 +269,22 @@ export function ChatApp() {
       {/* Composer */}
       <form onSubmit={send} className="bg-[#f0f2f5] px-2 pb-[max(8px,env(safe-area-inset-bottom))] pt-1.5">
         <div className="mx-auto mb-1.5 flex max-w-2xl gap-1.5 overflow-x-auto px-0.5 pb-0.5">
-          {QUICK.map((b) => (
-            <button
-              key={b.style}
-              type="button"
-              onClick={() => setMsgs((m) => [...m, { id: `local-${Date.now()}`, direction: "outbound", text: "Here's a breathing exercise. Tap start and follow the bubble 🫧", at: new Date().toISOString(), widgets: [{ type: "breathing", style: b.style }] }])}
-              className="whitespace-nowrap rounded-full bg-white px-3 py-1.5 text-[12.5px] text-[#111b21] shadow-[0_1px_0.5px_rgba(11,20,26,0.13)]"
-            >
-              {b.label}
-            </button>
-          ))}
+          {QUICK.map((k) => {
+            const a = ACTIVITIES.find((x) => x.key === k)!;
+            return (
+              <button key={k} type="button" onClick={() => startActivity(k)} className="whitespace-nowrap rounded-full bg-white px-3 py-1.5 text-[12.5px] text-[#111b21] shadow-[0_1px_0.5px_rgba(11,20,26,0.13)]">
+                {a.emoji} {a.label}
+              </button>
+            );
+          })}
+          <button type="button" onClick={() => setSheet(true)} className="whitespace-nowrap rounded-full bg-white px-3 py-1.5 text-[12.5px] font-medium text-[#008069] shadow-[0_1px_0.5px_rgba(11,20,26,0.13)]">
+            More…
+          </button>
         </div>
         <div className="mx-auto flex max-w-2xl items-end gap-1.5">
+          <button type="button" onClick={() => setSheet(true)} className="mb-[1px] flex h-[42px] w-9 shrink-0 items-center justify-center text-[#54656f]" aria-label="Activities">
+            <Plus className="h-6 w-6" />
+          </button>
           <div className="flex min-h-[44px] flex-1 items-end rounded-[22px] bg-white px-3 shadow-[0_1px_0.5px_rgba(11,20,26,0.13)]">
             <Smile className="mb-[11px] mr-2 h-[22px] w-[22px] shrink-0 text-[#54656f]" aria-hidden />
             <textarea
@@ -263,6 +307,38 @@ export function ChatApp() {
           </button>
         </div>
       </form>
+
+      <AnimatePresence>
+        {sheet ? (
+          <motion.div className="fixed inset-0 z-30 flex items-end bg-black/25" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSheet(false)}>
+            <motion.div
+              className="w-full rounded-t-3xl bg-white px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-4"
+              initial={{ y: 300 }}
+              animate={{ y: 0 }}
+              exit={{ y: 300 }}
+              transition={{ type: "spring", stiffness: 380, damping: 34 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mb-3 flex items-center justify-between">
+                <div className="text-[15px] font-semibold text-[#111b21]">Take a moment</div>
+                <button onClick={() => setSheet(false)} className="rounded-full p-1.5 text-[#54656f] hover:bg-[#f0f2f5]" aria-label="Close">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="grid grid-cols-4 gap-x-2 gap-y-4 pb-2">
+                {ACTIVITIES.map((a) => (
+                  <button key={a.key} onClick={() => startActivity(a.key)} className="flex flex-col items-center gap-1.5">
+                    <span className="flex h-14 w-14 items-center justify-center rounded-full text-[24px] shadow-sm" style={{ background: a.color }}>
+                      {a.emoji}
+                    </span>
+                    <span className="text-center text-[11.5px] leading-tight text-[#54656f]">{a.label}</span>
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }

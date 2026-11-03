@@ -13,6 +13,16 @@ export const BREATHING = {
     steps: ["Breathe in gently through your nose for 4", "Breathe out through your mouth for 6, like fogging a window", "Keep going for about a minute"],
     note: "A longer out-breath helps the body settle.",
   },
+  sigh: {
+    name: "Calming sigh",
+    steps: ["Breathe in through your nose for 2", "Take one more short sip of air on top", "Let it all go with a long, slow breath out for 6", "Repeat 5 times"],
+    note: "One of the quickest ways to settle a racing heart.",
+  },
+  even: {
+    name: "Even breathing",
+    steps: ["Breathe in softly for 5", "Breathe out softly for 5", "Keep this gentle rhythm for about a minute"],
+    note: "A steady, balanced rhythm – nothing to force.",
+  },
   wind_down: {
     name: "Wind-down breathing",
     steps: ["Get comfortable and let your shoulders drop", "Breathe in for 4", "Hold softly for 7 (or less if that's a stretch)", "Breathe out slowly for 8", "Repeat 3 or 4 times"],
