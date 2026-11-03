@@ -31,9 +31,36 @@ export class AnthropicLlm implements Llm {
   async create(req: LlmRequest): Promise<LlmResponse> {
     const system: Anthropic.Beta.Messages.BetaTextBlockParam[] = [{ type: "text", text: req.system, cache_control: { type: "ephemeral" } }];
     if (req.context) system.push({ type: "text", text: req.context });
-    const supportsFallback = !req.model.startsWith("claude-haiku");
+    const supportsFallback = !req.model.startsWith("claude-haiku") && !this.fallbackRejected;
     const started = Date.now();
-    const res = await this.sdk().beta.messages.create(
+    let res;
+    try {
+      res = await this.send(req, system, supportsFallback);
+    } catch (e) {
+      // Some accounts don't have the server-side fallback beta: retry once without it.
+      if (supportsFallback && e instanceof Anthropic.BadRequestError && /fallback|beta/i.test(e.message)) {
+        this.fallbackRejected = true;
+        res = await this.send(req, system, false);
+      } else throw e;
+    }
+    return {
+      content: res.content,
+      stopReason: res.stop_reason,
+      usage: {
+        input: res.usage.input_tokens,
+        output: res.usage.output_tokens,
+        cacheRead: res.usage.cache_read_input_tokens ?? 0,
+        cacheWrite: res.usage.cache_creation_input_tokens ?? 0,
+      },
+      model: res.model,
+      latencyMs: Date.now() - started,
+    };
+  }
+
+  private fallbackRejected = false;
+
+  private send(req: LlmRequest, system: Anthropic.Beta.Messages.BetaTextBlockParam[], supportsFallback: boolean) {
+    return this.sdk().beta.messages.create(
       {
         model: req.model,
         max_tokens: req.maxTokens,
@@ -48,18 +75,6 @@ export class AnthropicLlm implements Llm {
       },
       { timeout: req.timeoutMs ?? 45000 },
     );
-    return {
-      content: res.content,
-      stopReason: res.stop_reason,
-      usage: {
-        input: res.usage.input_tokens,
-        output: res.usage.output_tokens,
-        cacheRead: res.usage.cache_read_input_tokens ?? 0,
-        cacheWrite: res.usage.cache_creation_input_tokens ?? 0,
-      },
-      model: res.model,
-      latencyMs: Date.now() - started,
-    };
   }
 
   /** Lightweight health check: the Models API needs a valid key but costs nothing. */
