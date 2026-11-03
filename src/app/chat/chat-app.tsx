@@ -1,40 +1,50 @@
 "use client";
+/**
+ * Calm-1 test chat, styled like a WhatsApp conversation so testers get a
+ * feel for the real experience. Same engine as the WhatsApp channel; web-only
+ * extras (animated breathing, Calm content cards) render under replies.
+ */
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MoreVertical, RotateCcw, Send } from "lucide-react";
-import { LogoMark } from "@/components/admin/logo";
+import { ChevronLeft, MoreVertical, RotateCcw, SendHorizontal, Smile } from "lucide-react";
 import { BreathingCard } from "./breathing-card";
+import { ContentCards, type ContentItem } from "./content-card";
 import { cn } from "@/lib/utils";
+
+type Widget = { type: "breathing"; style: string } | { type: "content"; items: ContentItem[] };
 
 interface Msg {
   id: string;
   direction: "inbound" | "outbound";
   text: string;
   at: string;
-  widget?: { type: "breathing"; style: string };
+  widgets?: Widget[];
 }
 
-const WIDGETS_KEY = "calm1-chat-widgets";
-function savedWidgets(): Record<string, Msg["widget"]> {
+const WIDGETS_KEY = "calm1-chat-widgets-v2";
+function savedWidgets(): Record<string, Widget[]> {
   try {
-    return JSON.parse(localStorage.getItem(WIDGETS_KEY) ?? "{}") as Record<string, Msg["widget"]>;
+    return JSON.parse(localStorage.getItem(WIDGETS_KEY) ?? "{}") as Record<string, Widget[]>;
   } catch {
     return {};
   }
 }
-function saveWidget(id: string, w: Msg["widget"]) {
+function saveWidgets(id: string, w: Widget[]) {
   try {
     localStorage.setItem(WIDGETS_KEY, JSON.stringify({ ...savedWidgets(), [id]: w }));
   } catch {}
 }
 
-/** Render WhatsApp-style *bold* and links. */
-function rich(text: string) {
-  return text.split(/(\*[^*\n]+\*|https?:\/\/\S+)/g).map((p, i) =>
+/** Render WhatsApp-style *bold*, _italic_ and links; drop links already shown as cards. */
+function rich(text: string, hideUrls: Set<string>) {
+  const cleaned = hideUrls.size ? text.replace(/https?:\/\/[^\s)]+/g, (u) => (hideUrls.has(u.replace(/[.,;:!?]+$/, "")) ? "" : u)).replace(/\(\s*\)/g, "").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim() : text;
+  return cleaned.split(/(\*[^*\n]+\*|_[^_\n]+_|https?:\/\/\S+)/g).map((p, i) =>
     /^\*[^*]+\*$/.test(p) ? (
       <strong key={i}>{p.slice(1, -1)}</strong>
+    ) : /^_[^_]+_$/.test(p) ? (
+      <em key={i}>{p.slice(1, -1)}</em>
     ) : /^https?:\/\//.test(p) ? (
-      <a key={i} href={p} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+      <a key={i} href={p} target="_blank" rel="noreferrer" className="break-all text-[#027eb5] underline-offset-2 hover:underline">
         {p}
       </a>
     ) : (
@@ -42,6 +52,23 @@ function rich(text: string) {
     ),
   );
 }
+
+const time = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+
+function Ticks() {
+  return (
+    <svg viewBox="0 0 16 11" width="16" height="11" className="ml-1 inline-block shrink-0" aria-label="Read">
+      <path d="M11.07.65 4.6 7.12 1.93 4.45.88 5.5l3.72 3.72L12.12 1.7z" fill="#53bdeb" />
+      <path d="M15.07.65 8.6 7.12l-.9-.9-1.05 1.05 1.95 1.95L16.12 1.7z" fill="#53bdeb" />
+    </svg>
+  );
+}
+
+const QUICK = [
+  { style: "slow", label: "🫧 Breathe · 1 min" },
+  { style: "box", label: "🟦 Box breathing" },
+  { style: "wind_down", label: "🌙 Wind down" },
+];
 
 export function ChatApp() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
@@ -55,7 +82,7 @@ export function ChatApp() {
     const r = await fetch("/api/chat/state", { cache: "no-store" });
     if (!r.ok) return;
     const w = savedWidgets();
-    const server = ((await r.json()) as { messages: Msg[] }).messages.map((m) => (w[m.id] ? { ...m, widget: w[m.id] } : m));
+    const server = ((await r.json()) as { messages: Msg[] }).messages.map((m) => (w[m.id] ? { ...m, widgets: w[m.id] } : m));
     setMsgs((m) => (server.length >= m.length ? server : m));
   };
 
@@ -73,16 +100,15 @@ export function ChatApp() {
     setText("");
     setError(null);
     setSending(true);
-    const tmp: Msg = { id: `tmp-${Date.now()}`, direction: "inbound", text: body, at: new Date().toISOString() };
-    setMsgs((m) => [...m, tmp]);
+    setMsgs((m) => [...m, { id: `tmp-${Date.now()}`, direction: "inbound", text: body, at: new Date().toISOString() }]);
     try {
       const r = await fetch("/api/chat/message", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: body }) });
-      const j = (await r.json()) as { replies?: { id: string; text: string; widget?: Msg["widget"] }[]; deleted?: boolean; error?: string | null };
+      const j = (await r.json()) as { replies?: { id: string; text: string; widgets?: Widget[] }[]; deleted?: boolean; error?: string | null };
       if (!r.ok) throw new Error(j.error ?? "Something went wrong");
       // Show replies straight from the response (don't depend on re-reading storage).
       const replies = (j.replies ?? []).map((x) => {
-        if (x.widget) saveWidget(x.id, x.widget);
-        return { id: x.id, direction: "outbound" as const, text: x.text, at: new Date().toISOString(), widget: x.widget };
+        if (x.widgets?.length) saveWidgets(x.id, x.widgets);
+        return { id: x.id, direction: "outbound" as const, text: x.text, at: new Date().toISOString(), widgets: x.widgets };
       });
       setMsgs((m) => [...m, ...replies]);
       if (j.error) setError(j.error);
@@ -97,104 +123,145 @@ export function ChatApp() {
   async function reset() {
     setMenu(false);
     await fetch("/api/chat/reset", { method: "POST" });
+    try {
+      localStorage.removeItem(WIDGETS_KEY);
+    } catch {}
     setMsgs([]);
   }
 
   return (
-    <div className="flex h-[100dvh] flex-col bg-canvas">
-      <header className="flex items-center gap-3 border-b border-line bg-surface px-4 pb-3 pt-[max(12px,env(safe-area-inset-top))]">
-        <LogoMark size={38} />
-        <div className="min-w-0 flex-1">
-          <div className="text-[15.5px] font-semibold text-ink">Calm-1</div>
-          <div className="flex items-center gap-1.5 text-[12px] text-good">
-            <span className="h-1.5 w-1.5 rounded-full bg-good" /> Test version
-          </div>
+    <div className="flex h-[100dvh] flex-col bg-[#efeae2]">
+      {/* Header */}
+      <header className="flex items-center gap-2 bg-[#008069] px-2 pb-2.5 pt-[max(10px,env(safe-area-inset-top))] text-white">
+        <ChevronLeft className="h-6 w-6 shrink-0 opacity-90" aria-hidden />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/calm-icon.png" alt="" className="h-10 w-10 shrink-0 rounded-full" />
+        <div className="min-w-0 flex-1 pl-1">
+          <div className="truncate text-[16.5px] font-medium leading-tight">Calm-1</div>
+          <div className="truncate text-[12.5px] text-white/80">{sending ? "typing…" : "online"}</div>
         </div>
         <div className="relative">
-          <button onClick={() => setMenu((v) => !v)} className="rounded-full p-2 text-ink-3 hover:bg-surface-sunken" aria-label="Menu">
+          <button onClick={() => setMenu((v) => !v)} className="rounded-full p-2 hover:bg-white/10" aria-label="Menu">
             <MoreVertical className="h-5 w-5" />
           </button>
           {menu ? (
-            <div className="absolute right-0 top-11 z-10 w-48 rounded-xl border border-line bg-surface p-1 shadow-pop">
-              <button onClick={reset} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13.5px] text-ink-2 hover:bg-surface-sunken">
-                <RotateCcw className="h-4 w-4" /> Start over (erase chat)
+            <div className="absolute right-1 top-11 z-20 w-52 rounded-lg bg-white py-1.5 text-[#111b21] shadow-pop">
+              <button onClick={reset} className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-[14.5px] hover:bg-[#f5f6f6]">
+                <RotateCcw className="h-4 w-4 text-[#54656f]" /> Clear chat & start over
               </button>
             </div>
           ) : null}
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto px-3 py-4" onClick={() => setMenu(false)}>
-        <div className="mx-auto flex max-w-xl flex-col gap-2">
+      {/* Conversation */}
+      <main
+        className="flex-1 overflow-y-auto px-[10px] py-3"
+        onClick={() => setMenu(false)}
+        style={{
+          backgroundImage: "radial-gradient(rgba(84,101,111,0.08) 1.2px, transparent 1.2px), radial-gradient(rgba(84,101,111,0.05) 1.2px, transparent 1.2px)",
+          backgroundSize: "22px 22px, 22px 22px",
+          backgroundPosition: "0 0, 11px 11px",
+        }}
+      >
+        <div className="mx-auto flex max-w-2xl flex-col gap-[3px]">
+          <div className="mx-auto mb-2 rounded-lg bg-white/90 px-3 py-1 text-[12.5px] text-[#54656f] shadow-[0_1px_0.5px_rgba(11,20,26,0.13)]">Today</div>
+          <div className="mx-auto mb-3 max-w-[90%] rounded-lg bg-[#ffeecd] px-3 py-1.5 text-center text-[12.5px] leading-snug text-[#54656f] shadow-[0_1px_0.5px_rgba(11,20,26,0.13)]">
+            🔒 You're chatting with Calm-1, an AI companion (test version). Not an emergency service – in an emergency call 999.
+          </div>
+
           {msgs.length === 0 && !sending ? (
-            <div className="mx-auto mt-16 flex max-w-xs flex-col items-center text-center">
-              <LogoMark size={64} />
-              <p className="mt-4 text-[17px] font-semibold text-ink">Calm, just a message away.</p>
-              <p className="mt-1 text-[14px] text-ink-3">Say hi to start. This is a test version of Calm-1 – it works just like it will on WhatsApp.</p>
+            <div className="mx-auto mt-10 flex max-w-xs flex-col items-center text-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brand/calm-icon.png" alt="Calm" className="h-16 w-16 rounded-2xl shadow-card" />
+              <p className="mt-3 text-[16px] font-medium text-[#111b21]">Calm, just a message away.</p>
+              <p className="mt-1 text-[13.5px] text-[#54656f]">Say hi to start.</p>
             </div>
           ) : null}
-          {msgs.map((m) => (
-            <motion.div key={m.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15 }} className={cn("flex flex-col", m.direction === "inbound" ? "items-end" : "items-start")}>
-              <div className={cn("max-w-[82%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-[15px] leading-[1.45]", m.direction === "inbound" ? "rounded-br-md bg-calm-500 text-white" : "rounded-bl-md border border-line bg-surface text-ink")}>
-                {rich(m.text)}
-                <div className={cn("mt-0.5 text-right text-[10.5px]", m.direction === "inbound" ? "text-white/70" : "text-ink-4")}>{new Date(m.at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</div>
-              </div>
-              {m.widget?.type === "breathing" ? <BreathingCard style={m.widget.style} /> : null}
-            </motion.div>
-          ))}
+
+          {msgs.map((m, i) => {
+            const mine = m.direction === "inbound";
+            const first = i === 0 || msgs[i - 1]!.direction !== m.direction;
+            const cardUrls = new Set((m.widgets ?? []).flatMap((w) => (w.type === "content" ? w.items.map((x) => x.url) : [])));
+            return (
+              <motion.div key={m.id} initial={{ opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.14 }} className={cn("flex flex-col", mine ? "items-end" : "items-start", first && i > 0 ? "mt-2" : "")}>
+                <div
+                  className={cn(
+                    "relative max-w-[85%] whitespace-pre-wrap break-words rounded-[7.5px] px-[9px] pb-[6px] pt-[6px] text-[14.6px] leading-[1.38] text-[#111b21] shadow-[0_1px_0.5px_rgba(11,20,26,0.13)]",
+                    mine ? "bg-[#d9fdd3]" : "bg-white",
+                    first ? (mine ? "rounded-tr-none" : "rounded-tl-none") : "",
+                  )}
+                >
+                  {first ? (
+                    <svg viewBox="0 0 8 13" width="8" height="13" className={cn("absolute top-0", mine ? "-right-[8px]" : "-left-[8px] -scale-x-100")} aria-hidden>
+                      <path d="M0 0h8L0 13z" fill={mine ? "#d9fdd3" : "#ffffff"} transform={mine ? "" : ""} />
+                    </svg>
+                  ) : null}
+                  <span>{rich(m.text, cardUrls)}</span>
+                  <span className="float-right ml-3 mt-[6px] flex translate-y-[3px] items-center text-[11px] leading-none text-[#667781]">
+                    {time(m.at)}
+                    {mine ? <Ticks /> : null}
+                  </span>
+                </div>
+                {(m.widgets ?? []).map((w, wi) =>
+                  w.type === "breathing" ? <BreathingCard key={wi} style={w.style} /> : w.type === "content" ? <ContentCards key={wi} items={w.items} /> : null,
+                )}
+              </motion.div>
+            );
+          })}
+
           <AnimatePresence>
             {sending ? (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex">
-                <div className="flex gap-1 rounded-2xl rounded-bl-md border border-line bg-surface px-4 py-3">
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="mt-2 flex">
+                <div className="relative flex gap-1 rounded-[7.5px] rounded-tl-none bg-white px-4 py-3 shadow-[0_1px_0.5px_rgba(11,20,26,0.13)]">
                   {[0, 1, 2].map((d) => (
-                    <motion.span key={d} className="h-1.5 w-1.5 rounded-full bg-ink-4" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.1, repeat: Infinity, delay: d * 0.18 }} />
+                    <motion.span key={d} className="h-2 w-2 rounded-full bg-[#8696a0]" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.1, repeat: Infinity, delay: d * 0.18 }} />
                   ))}
                 </div>
               </motion.div>
             ) : null}
           </AnimatePresence>
-          {error ? <p className="text-center text-[12.5px] text-bad">{error}</p> : null}
-          <div ref={end} />
+          {error ? <p className="mx-auto mt-2 max-w-[90%] rounded-lg bg-white/90 px-3 py-1.5 text-center text-[12.5px] text-[#ea0038]">{error}</p> : null}
+          <div ref={end} className="h-1" />
         </div>
       </main>
 
-      <form onSubmit={send} className="border-t border-line bg-surface px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-2.5">
-        <div className="mx-auto mb-2 flex max-w-xl gap-1.5 overflow-x-auto">
-          {[
-            { style: "slow", label: "Breathe · 1 min" },
-            { style: "box", label: "Box breathing" },
-            { style: "wind_down", label: "Wind down" },
-          ].map((b) => (
+      {/* Composer */}
+      <form onSubmit={send} className="bg-[#f0f2f5] px-2 pb-[max(8px,env(safe-area-inset-bottom))] pt-1.5">
+        <div className="mx-auto mb-1.5 flex max-w-2xl gap-1.5 overflow-x-auto px-0.5 pb-0.5">
+          {QUICK.map((b) => (
             <button
               key={b.style}
               type="button"
-              onClick={() => setMsgs((m) => [...m, { id: `local-${Date.now()}`, direction: "outbound", text: "Here's a breathing exercise. Tap start and follow the bubble.", at: new Date().toISOString(), widget: { type: "breathing", style: b.style } }])}
-              className="whitespace-nowrap rounded-full border border-calm-100 bg-calm-50 px-3 py-1.5 text-[12.5px] font-medium text-calm-700"
+              onClick={() => setMsgs((m) => [...m, { id: `local-${Date.now()}`, direction: "outbound", text: "Here's a breathing exercise. Tap start and follow the bubble 🫧", at: new Date().toISOString(), widgets: [{ type: "breathing", style: b.style }] }])}
+              className="whitespace-nowrap rounded-full bg-white px-3 py-1.5 text-[12.5px] text-[#111b21] shadow-[0_1px_0.5px_rgba(11,20,26,0.13)]"
             >
               {b.label}
             </button>
           ))}
         </div>
-        <div className="mx-auto flex max-w-xl items-end gap-2">
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                void send();
-              }
-            }}
-            rows={1}
-            placeholder="Message Calm-1…"
-            aria-label="Message"
-            className="max-h-32 min-h-[44px] flex-1 resize-none rounded-[22px] border border-line bg-surface-muted px-4 py-[11px] text-[16px] text-ink placeholder:text-ink-4 focus:border-calm-400 focus:outline-none"
-          />
-          <button type="submit" disabled={!text.trim() || sending} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-ink text-white transition-opacity disabled:opacity-40" aria-label="Send">
-            <Send className="h-[18px] w-[18px]" />
+        <div className="mx-auto flex max-w-2xl items-end gap-1.5">
+          <div className="flex min-h-[44px] flex-1 items-end rounded-[22px] bg-white px-3 shadow-[0_1px_0.5px_rgba(11,20,26,0.13)]">
+            <Smile className="mb-[11px] mr-2 h-[22px] w-[22px] shrink-0 text-[#54656f]" aria-hidden />
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void send();
+                }
+              }}
+              rows={1}
+              placeholder="Message"
+              aria-label="Message"
+              className="max-h-32 flex-1 resize-none bg-transparent py-[11px] text-[16px] text-[#111b21] placeholder:text-[#8696a0] focus:outline-none focus-visible:shadow-none"
+            />
+          </div>
+          <button type="submit" disabled={!text.trim() || sending} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#00a884] text-white transition-opacity disabled:opacity-60" aria-label="Send">
+            <SendHorizontal className="h-5 w-5" />
           </button>
         </div>
-        <p className="mx-auto mt-1.5 max-w-xl text-center text-[11px] text-ink-4">Calm-1 is an AI, not a therapist or emergency service. In an emergency call 999.</p>
       </form>
     </div>
   );

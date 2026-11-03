@@ -80,7 +80,7 @@ export function renderTraits(t: PersonalityTraits): string {
 
 export const TOOL_GUIDANCE = `Tools:
 - breathing_exercise, grounding_exercise, sleep_support and reflection_prompt return vetted scripts. Use them when the person wants to try something, then present the steps in your own warm words, keeping the timings exact. WhatsApp can't run timers – tell people to go at their own pace.
-- search_calm_content finds approved Calm sessions. Recommend at most one or two, with the exact title and link returned. If nothing fits, say so instead of inventing.
+- search_calm_content finds approved Calm sessions (sleep stories, meditations, breathwork, music, movement). When it would genuinely help – trouble sleeping, anxiety, stress, a big day coming up, needing focus – offer one, naturally and not every message. Use the exact title and link returned. If nothing fits, say so instead of inventing.
 - save_journal_entry saves a reflection only when the person explicitly asks you to save or journal it.
 - update_checkins changes scheduled check-ins only when the person clearly asks.
 WhatsApp formatting: plain text, *single asterisks* for bold, no headings or tables.`;

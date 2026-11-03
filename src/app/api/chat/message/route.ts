@@ -7,6 +7,8 @@ import { getOrCreateChatUser, clearChatCookie } from "@/lib/chat/identity";
 import { kickWorker } from "@/lib/jobs/inprocess";
 import { rateLimit } from "@/lib/ratelimit";
 import { RateLimitedError } from "@/lib/errors";
+import { ensureTestContent } from "@/lib/content/test-catalogue";
+import { db } from "@/lib/db";
 
 export const maxDuration = 120;
 
@@ -16,6 +18,7 @@ export const POST = handle(async (req: Request) => {
   const rl = await rateLimit(`chat-ip:${ip}`, 30, 60);
   if (!rl.allowed) throw new RateLimitedError(rl.retryAfterSeconds);
   const { text } = await parseBody(req, z.object({ text: z.string().trim().min(1).max(2000) }));
+  await ensureTestContent();
   const user = await getOrCreateChatUser();
   const result = await handleInbound({ user, channel: "simulator", text, kind: "text" });
   if (result.deleted) {
@@ -23,9 +26,17 @@ export const POST = handle(async (req: Request) => {
     await clearChatCookie();
   }
   after(() => kickWorker());
-  // Visual extras for the web chat: an animated card for each breathing exercise Calm-1 ran.
-  const breathing = result.debug.tools.filter((t) => t.name === "breathing_exercise" && t.status === "ok").map((t) => String(t.input.style ?? "slow"));
-  const replies = result.replies.map((r, i, all) => ({ id: r.messageId, text: r.text, ...(i === all.length - 1 && breathing.length ? { widget: { type: "breathing", style: breathing[0] } } : {}) }));
+  // Visual extras for the web chat: animated breathing and Calm content cards.
+  const widgets: Record<string, unknown>[] = [];
+  for (const t of result.debug.tools.filter((x) => x.status === "ok")) {
+    if (t.name === "breathing_exercise") widgets.push({ type: "breathing", style: String(t.input.style ?? "slow") });
+    if (t.name === "search_calm_content") {
+      const ids = (t.input.results as string[] | undefined) ?? [];
+      const items = (await Promise.all(ids.slice(0, 2).map((id) => db().get("content_items", id)))).filter(Boolean);
+      if (items.length) widgets.push({ type: "content", items: items.map((i) => ({ title: i!.title, description: i!.description, category: i!.category, minutes: i!.duration_minutes, url: i!.url })) });
+    }
+  }
+  const replies = result.replies.map((r, i, all) => ({ id: r.messageId, text: r.text, ...(i === all.length - 1 && widgets.length ? { widgets } : {}) }));
   return json({ replies, deleted: !!result.deleted, error: chatError(result.debug) });
 });
 
