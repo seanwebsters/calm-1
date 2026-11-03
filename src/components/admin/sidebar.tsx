@@ -20,7 +20,7 @@ const NAV = [
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
-export function Sidebar({ admin, environment }: { admin: { name: string; email: string; roleLabel: string }; environment: string }) {
+export function Sidebar({ admin, environment, openAccess = false }: { admin: { name: string; email: string; roleLabel: string }; environment: string; openAccess?: boolean }) {
   const path = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -83,9 +83,11 @@ export function Sidebar({ admin, environment }: { admin: { name: string; email: 
               <Link href="/settings?tab=team" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] text-ink-2 hover:bg-surface-sunken">
                 <Users className="h-4 w-4" /> Team & access
               </Link>
-              <button onClick={signOut} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[13px] text-ink-2 hover:bg-surface-sunken">
-                <LogOut className="h-4 w-4" /> Sign out
-              </button>
+              {openAccess ? null : (
+                <button onClick={signOut} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[13px] text-ink-2 hover:bg-surface-sunken">
+                  <LogOut className="h-4 w-4" /> Sign out
+                </button>
+              )}
             </motion.div>
           ) : null}
         </AnimatePresence>

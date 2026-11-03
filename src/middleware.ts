@@ -6,7 +6,7 @@ import { SESSION_COOKIE, verifySession } from "@/lib/auth/session-token";
  * grained permission checks happen in each page and route handler.
  * The WhatsApp webhook and cron endpoints authenticate themselves.
  */
-const PUBLIC = ["/chat", "/api/chat", "/manifest.webmanifest", "/login", "/api/auth/login", "/api/whatsapp/webhook", "/api/twilio/webhook", "/api/twilio/status", "/api/cron/tick", "/api/health/live"];
+const PUBLIC = ["/api/auth/auto", "/chat", "/api/chat", "/manifest.webmanifest", "/login", "/api/auth/login", "/api/whatsapp/webhook", "/api/twilio/webhook", "/api/twilio/status", "/api/cron/tick", "/api/health/live"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -15,6 +15,13 @@ export async function middleware(req: NextRequest) {
   if (session) return NextResponse.next();
   if (pathname.startsWith("/api/")) return NextResponse.json({ error: "Sign in required." }, { status: 401 });
   const url = req.nextUrl.clone();
+  // No passcode configured: skip the sign-in screen entirely.
+  const openAccess = process.env.AUTH_PROVIDER?.trim() !== "supabase" && !process.env.ADMIN_PASSCODE?.trim();
+  if (openAccess) {
+    url.pathname = "/api/auth/auto";
+    url.search = `?next=${encodeURIComponent(pathname + req.nextUrl.search)}`;
+    return NextResponse.redirect(url);
+  }
   url.pathname = "/login";
   url.search = "";
   return NextResponse.redirect(url);

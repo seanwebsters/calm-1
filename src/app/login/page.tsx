@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { env } from "@/lib/env";
 import { LoginForm } from "./form";
 import { LogoMark } from "@/components/admin/logo";
@@ -6,6 +7,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Sign in" };
 
 export default function LoginPage() {
+  if (env.openAccess) redirect("/api/auth/auto");
   const mode = env.authProvider;
   const passcodeRequired = mode === "local" && !!env.adminPasscode;
   return (

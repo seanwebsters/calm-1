@@ -12,7 +12,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   await ensureBootstrapped();
   return (
     <div className="flex min-h-screen">
-      <Sidebar admin={{ name: admin.name, email: admin.email, roleLabel: ROLE_LABELS[admin.role] }} environment={env.deployment.environment} />
+      <Sidebar admin={{ name: admin.name, email: admin.email, roleLabel: ROLE_LABELS[admin.role] }} environment={env.deployment.environment} openAccess={env.openAccess} />
       <main className="min-w-0 flex-1">
         {env.openAccess || env.temporaryStorage ? (
           <div className="border-b border-warn/20 bg-warn-soft px-10 py-2 text-[12.5px] text-warn">
