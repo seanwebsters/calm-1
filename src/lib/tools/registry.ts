@@ -149,7 +149,7 @@ const checkins = tool(
       action: { type: "string", enum: ["subscribe", "pause", "resume", "unsubscribe"] },
       kind: { type: "string", enum: ["morning", "evening", "bedtime", "all"] },
       local_time: { type: ["string", "null"], description: "HH:MM for subscribe; null to use the default" },
-      frequency: { type: ["string", "null"], enum: ["daily", "weekdays", "weekly", null] },
+      frequency: { anyOf: [{ type: "string", enum: ["daily", "weekdays", "weekly"] }, { type: "null" }] },
     },
   },
   async (input, ctx) => {
